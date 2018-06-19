@@ -9,6 +9,7 @@ import tensorflow as tf
 class GriDMdp:
     def __init__(s):
         s.gamma = 0.9
+        s.alpha = 0.3
         s.epsilon = 0.1
         s.states = range(1,26)
         s.actions = ['n', 'e', 's', 'w']
@@ -129,7 +130,7 @@ class GriDMdp:
         featrues[5 + y_axis] = 1.0
         return featrues
 
-def monte_carlo_epsilon_greey(grid_mdp):
+def td_sarsa_linear_approximation(grid_mdp):
     '''action_strategy is epsilon_greey'''
     #construct model
     x_ph = tf.placeholder(tf.float32, shape=[None, 10], name="input_name")
@@ -139,7 +140,7 @@ def monte_carlo_epsilon_greey(grid_mdp):
     b = tf.Variable(tf.zeros([4]))
     y = tf.matmul(x_ph, w) + b
     loss = tf.reduce_mean(tf.square(y - y_ph))
-    optimizer = tf.train.GradientDescentOptimizer(0.01)
+    optimizer = tf.train.GradientDescentOptimizer(0.005)
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
     sess = tf.Session()
@@ -172,33 +173,49 @@ def monte_carlo_epsilon_greey(grid_mdp):
                     max_idx = aidx
                     max_aidx = act_idx
             action_prob[max_idx] += (1.0 - grid_mdp.epsilon)
+            # action-strategy choose epsilon_greey strategy
             action = np.random.choice(action_list, p=action_prob)
             next_state, state_reward, is_terminate, return_info = grid_mdp.transform(state, action)
-            one_sample_list.append((state, max_aidx, state_reward, pred_state_action_value))
-            state = next_state
-            sample_end = is_terminate
-        #compute state_action_value
-        G = 0.0
-        #print one_sample_list
-        for idx in range(len(one_sample_list)-1, -1, -1):
-            one_sample = one_sample_list[idx]
-            state = one_sample[0]
-            max_aidx = one_sample[1]
-            state_reward = one_sample[2]
-            real_y = one_sample[3]
-            G = state_reward +  grid_mdp.gamma * G
-            real_y[0, max_aidx] = G
-            input_features = grid_mdp.get_features(state)
+            # target-strategy choose epsilon_greey strategy
+            real_y = pred_state_action_value
+            if next_state in grid_mdp.trans:
+                next_action_list = grid_mdp.trans[next_state].keys()
+                len_next_action = len(next_action_list) 
+                next_action_prob = [grid_mdp.epsilon / float(len_next_action)] * len_next_action
+                next_input_features = grid_mdp.get_features(next_state)
+                next_pred_state_action_value = sess.run(y, feed_dict = {x_ph: [next_input_features]})
+                next_max_idx = 0
+                next_max_val = float("-inf")
+                next_max_aidx = 0
+                for next_aidx in range(len_next_action):
+                    next_act_idx = action_dic[next_action_list[next_aidx]]
+                    next_tmp_value = next_pred_state_action_value[0, next_act_idx]
+                    if next_tmp_value > next_max_val:
+                        next_max_val = next_tmp_value
+                        next_max_idx = next_aidx
+                        next_max_aidx = next_act_idx
+                next_action_prob[next_max_idx] += (1.0 - grid_mdp.epsilon)
+                next_action = np.random.choice(next_action_list, p=next_action_prob)
+                next_action_idx = action_dic[next_action]
+                difference = state_reward + grid_mdp.gamma * next_pred_state_action_value[0, next_action_idx] - pred_state_action_value[0, max_aidx]
+                real_y[0, max_aidx] += grid_mdp.alpha * difference 
+            else:
+                difference = state_reward - pred_state_action_value[0, max_aidx]
+                real_y[0, max_aidx] += grid_mdp.alpha * difference
+            # train
             feed_data = {x_ph: [np.array(input_features)], y_ph: real_y}
             sess.run(train, feed_dict = feed_data)
             total_loss += sess.run(loss, feed_data)
+            state = next_state
+            sample_end = is_terminate
 
         if iter_idx % 100 == 0:
             print "-"*18 + str(iter_idx) + "-"*18
-            iter_para = 0.01/(float(iter_idx/100)**0.5)
+            iter_para = 0.01
+            #iter_para = 0.01/(float(iter_idx/100)**0.5)
             print "total_loss: ", total_loss, "iter_para: ", iter_para
             total_loss = 0.0
-            optimizer = tf.train.GradientDescentOptimizer(iter_para)
+            #optimizer = tf.train.GradientDescentOptimizer(iter_para)
             for state in grid_mdp.trans:
                 input_features = grid_mdp.get_features(state)
                 pred_state_action_value = sess.run(y, feed_dict = {x_ph: [input_features]})
@@ -208,4 +225,4 @@ def monte_carlo_epsilon_greey(grid_mdp):
                         print state, action, pred_state_action_value    
     sess.close()
 grid_mdp = GriDMdp()
-monte_carlo_epsilon_greey(grid_mdp)
+td_sarsa_linear_approximation(grid_mdp)
