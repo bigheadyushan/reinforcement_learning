@@ -123,24 +123,26 @@ class GriDMdp:
                 print "|"
     
     def get_features(s, state):
-        featrues = [0.0] * 10
-        x_axis = (state - 1) % 5
-        y_axis = (state - 1) / 5
-        featrues[x_axis] = 1.0
-        featrues[5 + y_axis] = 1.0
+        #featrues = [0.0] * 10
+        #x_axis = (state - 1) % 5
+        #y_axis = (state - 1) / 5
+        #featrues[x_axis] = 1.0
+        #featrues[5 + y_axis] = 1.0
+        featrues = [0.0] * 25
+        featrues[state - 1] = 1.0
         return featrues
 
 def td_sarsa_linear_approximation(grid_mdp):
     '''action_strategy is epsilon_greey'''
     #construct model
-    x_ph = tf.placeholder(tf.float32, shape=[None, 10], name="input_name")
+    x_ph = tf.placeholder(tf.float32, shape=[None, 25], name="input_name")
     y_ph = tf.placeholder(tf.float32, shape=[None, 4], name="output_name")
     #w = tf.Variable(tf.random_uniform([25,4], -1.0, 1.0))
-    w = tf.Variable(tf.zeros([10, 4]))
+    w = tf.Variable(tf.zeros([25, 4]))
     b = tf.Variable(tf.zeros([4]))
     y = tf.matmul(x_ph, w) + b
     loss = tf.reduce_mean(tf.square(y - y_ph))
-    optimizer = tf.train.GradientDescentOptimizer(0.005)
+    optimizer = tf.train.GradientDescentOptimizer(0.01)
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
     sess = tf.Session()

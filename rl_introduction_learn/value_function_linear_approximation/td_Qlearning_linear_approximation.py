@@ -123,24 +123,21 @@ class GriDMdp:
                 print "|"
     
     def get_features(s, state):
-        featrues = [0.0] * 10
-        x_axis = (state - 1) % 5
-        y_axis = (state - 1) / 5
-        featrues[x_axis] = 1.0
-        featrues[5 + y_axis] = 1.0
+        featrues = [0.0] * 25
+        featrues[state - 1] = 1.0
         return featrues
 
-def td_sarsa_linear_approximation(grid_mdp):
-    '''action_strategy is epsilon_greey'''
+def td_Qlearning_linear_approximation(grid_mdp):
+    '''action_strategy is greey'''
     #construct model
-    x_ph = tf.placeholder(tf.float32, shape=[None, 10], name="input_name")
+    x_ph = tf.placeholder(tf.float32, shape=[None, 25], name="input_name")
     y_ph = tf.placeholder(tf.float32, shape=[None, 4], name="output_name")
     #w = tf.Variable(tf.random_uniform([25,4], -1.0, 1.0))
-    w = tf.Variable(tf.zeros([10, 4]))
+    w = tf.Variable(tf.zeros([25, 4]))
     b = tf.Variable(tf.zeros([4]))
     y = tf.matmul(x_ph, w) + b
     loss = tf.reduce_mean(tf.square(y - y_ph))
-    optimizer = tf.train.GradientDescentOptimizer(0.005)
+    optimizer = tf.train.GradientDescentOptimizer(0.02)
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
     sess = tf.Session()
@@ -209,11 +206,10 @@ def td_sarsa_linear_approximation(grid_mdp):
 
         if iter_idx % 100 == 0:
             print "-"*18 + str(iter_idx) + "-"*18
-            iter_para = 0.01
-            #iter_para = 0.01/(float(iter_idx/100)**0.5)
+            iter_para = 0.03/(float(iter_idx/100)**0.5)
             print "total_loss: ", total_loss, "iter_para: ", iter_para
             total_loss = 0.0
-            #optimizer = tf.train.GradientDescentOptimizer(iter_para)
+            optimizer = tf.train.GradientDescentOptimizer(iter_para)
             for state in grid_mdp.trans:
                 input_features = grid_mdp.get_features(state)
                 pred_state_action_value = sess.run(y, feed_dict = {x_ph: [input_features]})
@@ -223,4 +219,4 @@ def td_sarsa_linear_approximation(grid_mdp):
                         print state, action, pred_state_action_value    
     sess.close()
 grid_mdp = GriDMdp()
-td_sarsa_linear_approximation(grid_mdp)
+td_Qlearning_linear_approximation(grid_mdp)
